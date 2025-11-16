@@ -1,10 +1,10 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv'
 import { Worker } from 'bullmq';
 import  Redis from 'ioredis';
 import  pg from 'pg';
 import { sendMail, renderTemplate } from './mailer.js';
-
 dotenv.config();
+
 
 const connection = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
 

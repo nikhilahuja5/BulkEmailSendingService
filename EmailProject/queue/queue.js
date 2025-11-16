@@ -1,8 +1,6 @@
-import dotenv from "dotenv";
 import  {Queue} from 'bullmq';
 import IORedis from 'ioredis';
 
-dotenv.config();
 let queue;
 
 export default { 

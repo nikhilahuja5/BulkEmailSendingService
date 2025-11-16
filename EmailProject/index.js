@@ -1,10 +1,11 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 import express from 'express';
 import bodyParser from 'body-parser';
 import {v4 as uuidv4} from 'uuid';
 import pg from 'pg';
 import QueueClient from './queue/queue.js';
 dotenv.config();
+
 
 const app = express();
 const id = uuidv4();
@@ -28,7 +29,7 @@ async function insertEmailRows(client , sendId , recipients, subject , body){
             VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`;
     const rows = [];
     for(const r of recipients){
-        const res = await clientquery(insertText, [sendId, r.email , r.name ?? null , subject , body, 'queued']);
+        const res = await client.query(insertText, [sendId, r.email , r.name ?? null , subject , body, 'queued']);
         rows.push({id : res.rows[0].id, recipient : r });
     }
     return rows;
@@ -76,7 +77,7 @@ app.post('/send-bulk', async(req,res) => {
                     body
                 },
                 {
-                jobId : String(emailId),
+                jobId : String(r.id),
                 attempts : parseInt(process.env.MAX_RETRIES || '5'),
                 backoff: {type: 'exponential' , delay : 1000 },
                 removeOnComplete : true,
@@ -86,7 +87,7 @@ app.post('/send-bulk', async(req,res) => {
     }
 
     await client.query('COMMIT');
-    res.json({sendId,queued:inserted.length});
+    res.json({sendId,queued:emailRows.length});
 
     }catch (err){
         await client.query('ROLLBACK');
