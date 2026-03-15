@@ -25,8 +25,8 @@ const worker = new Worker(queueName , async job => {
         const html = renderTemplate(body, {name : recipient.name});
         const text = html.replace(/<[^>]*>/g, '');
         
-        const info = await sendMail({to : recipient.email , toName: recipient.name , subject , html , text });
-        console.log("INFO",info);
+        const info = await sendMail({to : recipient.r , toName: recipient.name , subject , html , text });
+
         await client.query(
             `UPDATE "emailschema".emails SET status=$1, attempt_count = attempt_count + 1, message_id=$2, updated_at=now() WHERE id=$3`,
             ['sent', info.messageId || null , emailId]

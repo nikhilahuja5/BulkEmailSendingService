@@ -4,8 +4,6 @@ import handlebars from 'handlebars';
 
 dotenv.config();
 
-console.log("TYPE", typeof process.env.SMTP_PASS);
-
 const transporter = nodemailer.createTransport(
     {
     host : process.env.SMTP_HOST,

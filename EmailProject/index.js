@@ -14,6 +14,25 @@ app.use(bodyParser.json());
 
 const pool = new pg.Pool({connectionString : process.env.DATABASE_URL});
 const queue = QueueClient.getQueue();
+const RETRY_INTERVAL = 60000;
+
+async function retryFailedJobs() {
+    try {
+        const failedJobs = await queue.getFailed();
+        if (failedJobs.length > 0) {
+            console.log(`Retrying ${failedJobs.length} failed jobs...`);
+            for (const job of failedJobs) {
+                await job.retry();
+                console.log(`Retried job ${job.id}`);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to retry jobs:', err);
+    }
+}
+
+const failedJobs = await queue.getFailed();
+console.log('Failed jobs count:', failedJobs.length);
 
 async function createSendRecord(client , subject , body , ownerId ,total){
     const res = await client.query(
@@ -29,15 +48,19 @@ async function insertEmailRows(client , sendId , recipients, subject , body){
             VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`;
     const rows = [];
     for(const r of recipients){
-        const res = await client.query(insertText, [sendId, r.email , r.name ?? null , subject , body, 'queued']);
-        rows.push({id : res.rows[0].id, recipient : r });
+        const name = r.split('@')[0];
+
+        const res = await client.query(insertText, [sendId, r , name ?? null , subject , body, 'queued']);
+        rows.push({id : res.rows[0].id, recipient : {
+            r,name
+        } });
     }
     return rows;
 }
 
-app.post('/send-bulk', async(req,res) => {
+app.post('/send', async(req,res) => {
     const {ownerId,subject,body,recipients} = req.body;
-
+    console.log(req.body);
     
     if(!subject || !body || !Array.isArray(recipients) || recipients.length === 0){
         return res.status(400).json({ error: 'subject, body and recipients[] required' });
@@ -57,6 +80,7 @@ app.post('/send-bulk', async(req,res) => {
         );
         
         const sendId = sendRecord.id;
+        console.log(sendId);
 
         const emailRows = await insertEmailRows(
             client,
@@ -65,6 +89,8 @@ app.post('/send-bulk', async(req,res) => {
             subject,
             body
         );
+
+        console.log("emailRows",emailRows);
 
         for(const r of emailRows){
             await queue.add(
@@ -110,6 +136,8 @@ app.get('/status/:sendId' , async (req,res) => {
         client.release();
     }
 });
+
+// setInterval(retryFailedJobs, RETRY_INTERVAL);
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`server is listning at ${port}`));
